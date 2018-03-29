@@ -8342,7 +8342,7 @@ typedef struct ___vmstate_fdset_struct {
   ___VOLATILE int overflow;
 } ___vmstate_fdset;
 #endif
- 
+
 typedef struct ___vmstate_os_struct {
 #ifdef ___OS_WIN32
   int dummy; /* avoid empty struct error raised by MSVC */
@@ -8475,6 +8475,8 @@ typedef struct ___processor_state_struct
 
     ___WORD *heap_limit;
     ___WORD *hp;
+    ___WORD *lc_stack;
+    ___WORD *lc_global;
 
     ___WORD r[___NB_GVM_REGS];
     ___WORD pc;

@@ -5940,6 +5940,339 @@ ___PSDKR)
 #endif
 }
 
+___HIDDEN void nan_mark_array
+   ___P((___PSD
+         ___WORD *start,
+         ___WORD n),
+        (___PSV
+         start,
+         n)
+___PSDKR
+___WORD *start;
+___WORD n;)
+
+{
+  ___PSGET
+  ___WORD *alloc = alloc_heap_ptr;
+  ___WORD *limit = alloc_heap_limit;
+
+  while (n-- > 0)
+    {
+      ___WORD *cell = start++;
+
+    again: /* looping back here is possible when tail marking */
+      {
+        ___WORD obj = *cell;
+        ___WORD tag = (obj & 0xFFFF000000000000);
+
+        // Memory object
+        if (tag == 0xFFFF000000000000)
+          {
+            ___WORD addr;
+            ___WORD *body;
+            ___WORD head;
+            int head_typ;
+            int subtype;
+
+            addr = (obj & 0xFFFFFFFFFFFF);
+            head = *((___WORD*)addr);
+            body = ((___WORD*)addr)+1;
+            subtype = ___HD_SUBTYPE(head);
+            head_typ = ___HD_TYP(head);
+
+            if (head_typ == ___MOVABLE0)
+              {
+                ___SIZE_TS words = ___HD_WORDS(head);
+
+                while (alloc + words + 1 > limit)
+                  {
+                    alloc_heap_ptr = alloc;
+                    end_heap_chunk (___ps);
+                    next_heap_msection (___ps);
+                    prepare_heap_msection (___ps);
+                    alloc = alloc_heap_ptr;
+                    limit = alloc_heap_limit;
+                  }
+
+                *alloc++ = head;
+
+                // Write forwarding pointer
+                body[-1] = ___TAG((alloc - ___BODY_OFS), ___FORW);
+
+                // Write new tagged pointer in cell
+                ___WORD newaddr = alloc - ___BODY_OFS;
+                ___WORD tagged = 0xFFFF000000000000 | newaddr;
+                *cell = tagged;
+
+                if (words > 0 && subtype <= ___sBOXVALUES)
+                  cell = alloc;
+                else
+                  cell = 0;
+
+                while (words > 0)
+                  {
+                    *alloc++ = *body++;
+                    words--;
+                  }
+
+                if (alloc >= alloc_heap_chunk_limit)
+                  {
+                    alloc_heap_ptr = alloc;
+                    end_heap_chunk (___ps);
+                    start_heap_chunk (___ps);
+                    alloc = alloc_heap_ptr;
+                  }
+
+                if (cell != 0) goto again;
+              }
+            else if (head_typ == ___STILL)
+              {
+                printf("NYI STILL\n");
+                // if (body[___STILL_MARK_OFS - ___STILL_BODY_OFS] == -1)
+                //   {
+                //     body[___STILL_MARK_OFS - ___STILL_BODY_OFS]
+                //       = ___CAST(___WORD,still_objs_to_scan);
+                //     still_objs_to_scan
+                //       = ___CAST(___WORD,body - ___STILL_BODY_OFS);
+                //   }
+
+
+              }
+            else if (___TYP(head_typ) == ___FORW)
+              {
+                printf("NYI FORW\n");
+                //*cell = ___TAG(___UNTAG_AS(head, ___FORW), ___TYP(obj));
+              }
+
+          }
+      }
+    }
+
+  alloc_heap_ptr = alloc;
+}
+
+___HIDDEN ___SIZE_TS nan_scan
+   ___P((___PSD
+         ___WORD *body),
+        (___PSV
+         body)
+___PSDKR
+___WORD *body;)
+{
+  ___PSGET
+  ___WORD head = body[-1];
+  ___SIZE_TS words = ___HD_WORDS(head);
+  int subtype = ___HD_SUBTYPE(head);
+
+  switch (subtype)
+    {
+    case ___sFOREIGN:
+    case ___sSTRING:
+    case ___sS8VECTOR:
+    case ___sU8VECTOR:
+    case ___sS16VECTOR:
+    case ___sU16VECTOR:
+    case ___sS32VECTOR:
+    case ___sU32VECTOR:
+    case ___sS64VECTOR:
+    case ___sU64VECTOR:
+    case ___sF32VECTOR:
+    case ___sF64VECTOR:
+    case ___sFLONUM:
+    case ___sBIGNUM:
+      break;
+
+    case ___sWEAK:
+      printf("Unexpected case.\n"); // ___sWEAK is not used by lc
+      exit(0);
+      break;
+
+    case ___sSYMBOL:
+    case ___sKEYWORD:
+      printf("NYI case scan 1.\n");
+      exit(0);
+      //mark_array (___PSP body, 1); /* only scan name of symbols & keywords */
+      break;
+
+    case ___sCONTINUATION:
+      printf("Unexpected case.\n"); // ___sCONTINUATION is not used by lc
+      exit(0);
+      break;
+
+    case ___sFRAME:
+      printf("Unexpected case.\n"); // ___sWEAKFRAME is not used by lc
+      exit(0);
+      break;
+
+    case ___sPROCEDURE:
+      printf("NYI case scan 2.\n");
+      exit(0);
+      //mark_array (___PSP body, 1); /* only scan name of symbols & keywords */
+      mark_array (___PSP body+1, words-1); /* only scan free variables */
+      break;
+
+    default:
+      if (___HD_TYP(head) == ___MOVABLE0 && subtype <= ___sBOXVALUES) {
+          nan_mark_array (___PSP body+1, words-1);
+      }
+      else {
+          printf("NYI case scan 4.\n");
+          exit(0);
+          // mark_array (___PSP body, words);
+      }
+      break;
+    }
+
+  return words;
+}
+
+___HIDDEN void nan_scan_still_objs_to_scan
+   ___P((___PSDNC),
+        (___PSVNC)
+___PSDKR)
+{
+  ___PSGET
+  ___WORD *base;
+
+  while ((base = ___CAST(___WORD*,still_objs_to_scan)) != 0)
+    {
+      printf("NYI scanning nan still objects\n");
+      exit(0);
+      //
+      // still_objs_to_scan = base[___STILL_MARK_OFS];
+      // nan_scan (___PSP base + ___STILL_BODY_OFS);
+    }
+}
+
+___HIDDEN void nan_scan_movable_objs_to_scan
+   ___P((___PSDNC),
+        (___PSVNC)
+___PSDKR)
+{
+  ___PSGET
+
+  ___WORD *ptr = scan_ptr;
+  ___VOLATILE ___WORD *hcsh;
+
+  while (ptr != alloc_heap_ptr) /* SITUATION #1 or #2 ? */
+    {
+      while (___TYP(*ptr) != ___FORW) /* not end of complete chunk? */
+        {
+          ptr++;
+          ptr += nan_scan (___PSP ptr);
+          if (ptr == alloc_heap_ptr) /* end of incomplete chunk? */
+            {
+              /* SITUATION #3, done scanning all movable objects */
+              scan_ptr = ptr;
+              return;
+            }
+        }
+
+      scan_ptr = ptr; /* remember where scan ended */
+
+      /*
+       * SITUATION #1, at end of complete chunk.
+       */
+
+      ___SPINLOCK_LOCK(heap_chunks_to_scan_lock);
+
+      while ((hcsh=heap_chunks_to_scan_head) != heap_chunks_to_scan_tail)
+        {
+          /*
+           * Get the next complete heap chunk from heap chunk FIFO and
+           * scan it.
+           */
+
+           printf("NYI scan\n");
+           exit(0);
+
+          ptr = ___UNTAG_AS(*hcsh, ___FORW);
+
+          heap_chunks_to_scan_head = ptr;
+
+          ___SHARED_MEMORY_BARRIER(); /* share heap_chunks_to_scan_head */
+
+          ___SPINLOCK_UNLOCK(heap_chunks_to_scan_lock);
+
+          scan_complete_heap_chunk (___PSP ptr+1);
+
+          ___SPINLOCK_LOCK(heap_chunks_to_scan_lock);
+        }
+
+      ___SPINLOCK_UNLOCK(heap_chunks_to_scan_lock);
+
+      /*
+       * Scan the incomplete heap chunk currently being created.
+       */
+
+      ptr = alloc_heap_chunk_start;
+
+      scan_ptr = ptr;
+    }
+}
+
+___HIDDEN void nan_mark_reachable_from_marked
+   ___P((___PSDNC),
+        (___PSVNC)
+___PSDKR)
+{
+  ___PSGET
+
+  do
+    {
+      nan_scan_still_objs_to_scan (___PSPNC);
+      nan_scan_movable_objs_to_scan (___PSPNC);
+    } while (___CAST(___WORD*,still_objs_to_scan) != 0);
+}
+
+___HIDDEN void garbage_collect_nan_phase
+   ___P((___PSDNC),
+        (___PSVNC)
+___PSDKR)
+{
+  ___PSGET
+  ___virtual_machine_state ___vms = ___VMSTATE_FROM_PSTATE(___ps);
+
+  printf("Run GC nan phase... (lc_stack at %p)\n", ___PSTATE->lc_stack);
+
+  // Check if gc nan phase is needed
+  if (___PSTATE->lc_stack == NULL)
+    return;
+
+  reached_gc_hash_tables = ___TAG(0,0);
+  traverse_weak_refs = 0; /* don't traverse weak references in this phase */
+
+  if (___CAST(___WORD*,still_objs_to_scan) != 0) {
+      printf("Unexpected case.\n");
+      exit(0);
+  }
+  if (scan_ptr != alloc_heap_ptr) {
+      printf("Unexpected case.\n");
+      exit(0);
+  }
+
+  // Mark lc stack
+  printf("Marking lc_stack...\n");
+  ___WORD *body = (___PSTATE->lc_stack+1);
+  ___WORD stack_head = *___PSTATE->lc_stack;
+  ___WORD len = (stack_head >> 11);
+  nan_mark_array(___PSP body, len);
+  printf("Done marking lc_stack.\n");
+
+  // Mark reachable
+  printf("Marking reachable...\n");
+  nan_mark_reachable_from_marked(___PSPNC);
+  printf("Done marking reachable.\n");
+
+  if (___CAST(___WORD*,still_objs_to_scan) != 0) {
+      printf("Unexpected case after nan phase.\n");
+      exit(0);
+  }
+  if (scan_ptr != alloc_heap_ptr) {
+      printf("Unexpected case after nan phase.\n");
+      exit(0);
+  }
+}
 
 ___HIDDEN void garbage_collect_mark_weak_phase
    ___P((___PSDNC),
@@ -6094,6 +6427,9 @@ ___SIZE_TS requested_words_still;)
 
   BARRIER();
 
+
+  /* Process LC objects (nan boxed objects) */
+  garbage_collect_nan_phase(___PSPNC);
 
   /* Process gc hash tables and free unreachable still objects */
 
