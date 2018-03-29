@@ -3297,9 +3297,9 @@ ___virtual_machine_state ___vms;)
   ___ps->vmstate = ___vms;
 #endif
 
-  printf("Init lc_stack to NULL\n");
+  //printf("Init lc_stack to NULL\n");
   ___ps->lc_stack = NULL;
-  printf("Init lc_global to NULL\n");
+  //printf("Init lc_global to NULL\n");
   ___ps->lc_global = NULL;
 
   /*

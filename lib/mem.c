@@ -5940,6 +5940,8 @@ ___PSDKR)
 #endif
 }
 
+//#define printf(...)
+
 ___HIDDEN void nan_mark_array
    ___P((___PSD
          ___WORD *start,
@@ -6027,21 +6029,20 @@ ___WORD n;)
               }
             else if (head_typ == ___STILL)
               {
-                printf("NYI STILL\n");
-                // if (body[___STILL_MARK_OFS - ___STILL_BODY_OFS] == -1)
-                //   {
-                //     body[___STILL_MARK_OFS - ___STILL_BODY_OFS]
-                //       = ___CAST(___WORD,still_objs_to_scan);
-                //     still_objs_to_scan
-                //       = ___CAST(___WORD,body - ___STILL_BODY_OFS);
-                //   }
-
-
+                if (body[___STILL_MARK_OFS - ___STILL_BODY_OFS] == -1)
+                  {
+                    body[___STILL_MARK_OFS - ___STILL_BODY_OFS]
+                      = ___CAST(___WORD,still_objs_to_scan);
+                    still_objs_to_scan
+                      = ___CAST(___WORD,body - ___STILL_BODY_OFS);
+                  }
               }
             else if (___TYP(head_typ) == ___FORW)
               {
-                printf("NYI FORW\n");
-                //*cell = ___TAG(___UNTAG_AS(head, ___FORW), ___TYP(obj));
+                // Write new tagged pointer in cell
+                ___WORD newaddr = ___UNTAG_AS(head, ___FORW);
+                ___WORD tagged = 0xFFFF000000000000 | newaddr;
+                *cell = tagged;
               }
 
           }
@@ -6105,10 +6106,7 @@ ___WORD *body;)
       break;
 
     case ___sPROCEDURE:
-      printf("NYI case scan 2.\n");
-      exit(0);
-      //mark_array (___PSP body, 1); /* only scan name of symbols & keywords */
-      mark_array (___PSP body+1, words-1); /* only scan free variables */
+      nan_mark_array (___PSP body+1, words-1); /* only scan free variables */
       break;
 
     default:
@@ -6116,9 +6114,7 @@ ___WORD *body;)
           nan_mark_array (___PSP body+1, words-1);
       }
       else {
-          printf("NYI case scan 4.\n");
-          exit(0);
-          // mark_array (___PSP body, words);
+          nan_mark_array (___PSP body, words);
       }
       break;
     }
@@ -6136,13 +6132,30 @@ ___PSDKR)
 
   while ((base = ___CAST(___WORD*,still_objs_to_scan)) != 0)
     {
-      printf("NYI scanning nan still objects\n");
-      exit(0);
-      //
-      // still_objs_to_scan = base[___STILL_MARK_OFS];
-      // nan_scan (___PSP base + ___STILL_BODY_OFS);
+      still_objs_to_scan = base[___STILL_MARK_OFS];
+      nan_scan (___PSP base + ___STILL_BODY_OFS);
     }
 }
+
+___HIDDEN void nan_scan_complete_heap_chunk
+   ___P((___PSD
+         ___WORD *start),
+        (___PSV
+         start)
+___PSDKR
+___WORD *start;)
+{
+  ___PSGET
+  ___WORD *ptr = start;
+
+  while (___TYP(*ptr) != ___FORW) /* not end of complete chunk? */
+    {
+      ptr++;
+      ptr += nan_scan (___PSP ptr);
+    }
+
+}
+
 
 ___HIDDEN void nan_scan_movable_objs_to_scan
    ___P((___PSDNC),
@@ -6183,8 +6196,6 @@ ___PSDKR)
            * scan it.
            */
 
-           printf("NYI scan\n");
-           exit(0);
 
           ptr = ___UNTAG_AS(*hcsh, ___FORW);
 
@@ -6194,7 +6205,7 @@ ___PSDKR)
 
           ___SPINLOCK_UNLOCK(heap_chunks_to_scan_lock);
 
-          scan_complete_heap_chunk (___PSP ptr+1);
+          nan_scan_complete_heap_chunk (___PSP ptr+1);
 
           ___SPINLOCK_LOCK(heap_chunks_to_scan_lock);
         }
@@ -6233,11 +6244,14 @@ ___PSDKR)
   ___PSGET
   ___virtual_machine_state ___vms = ___VMSTATE_FROM_PSTATE(___ps);
 
-  printf("Run GC nan phase... (lc_stack at %p)\n", ___PSTATE->lc_stack);
+  printf("Run GC nan phase... (lc_stack at %p) (lc_global at %p)\n", ___PSTATE->lc_stack, ___PSTATE->lc_global);
 
   // Check if gc nan phase is needed
-  if (___PSTATE->lc_stack == NULL)
+  if (___PSTATE->lc_stack == NULL || ___PSTATE->lc_global == NULL)
+  {
+    printf("Skip phase.\n");
     return;
+  }
 
   reached_gc_hash_tables = ___TAG(0,0);
   traverse_weak_refs = 0; /* don't traverse weak references in this phase */
@@ -6254,10 +6268,18 @@ ___PSDKR)
   // Mark lc stack
   printf("Marking lc_stack...\n");
   ___WORD *body = (___PSTATE->lc_stack+1);
-  ___WORD stack_head = *___PSTATE->lc_stack;
-  ___WORD len = (stack_head >> 11);
+  ___WORD head = *___PSTATE->lc_stack;
+  ___WORD len = (head >> 11);
   nan_mark_array(___PSP body, len);
   printf("Done marking lc_stack.\n");
+
+  // Mark lc global
+  printf("Marking lc_global...\n");
+  body = (___PSTATE->lc_global+1);
+  head = *___PSTATE->lc_global;
+  len = (head >> 11);
+  nan_mark_array(___PSP body, len);
+  printf("Done marking lc_global.\n");
 
   // Mark reachable
   printf("Marking reachable...\n");
