@@ -6062,6 +6062,7 @@ ___WORD *body;)
 {
   ___PSGET
   ___WORD head = body[-1];
+
   ___SIZE_TS words = ___HD_WORDS(head);
   int subtype = ___HD_SUBTYPE(head);
 
@@ -6244,14 +6245,9 @@ ___PSDKR)
   ___PSGET
   ___virtual_machine_state ___vms = ___VMSTATE_FROM_PSTATE(___ps);
 
-  printf("Run GC nan phase... (lc_stack at %p) (lc_global at %p)\n", ___PSTATE->lc_stack, ___PSTATE->lc_global);
-
   // Check if gc nan phase is needed
   if (___PSTATE->lc_stack == NULL || ___PSTATE->lc_global == NULL)
-  {
-    printf("Skip phase.\n");
     return;
-  }
 
   reached_gc_hash_tables = ___TAG(0,0);
   traverse_weak_refs = 0; /* don't traverse weak references in this phase */
@@ -6265,26 +6261,21 @@ ___PSDKR)
       exit(0);
   }
 
+
   // Mark lc stack
-  printf("Marking lc_stack...\n");
   ___WORD *body = (___PSTATE->lc_stack+1);
   ___WORD head = *___PSTATE->lc_stack;
   ___WORD len = (head >> 11);
   nan_mark_array(___PSP body, len);
-  printf("Done marking lc_stack.\n");
 
   // Mark lc global
-  printf("Marking lc_global...\n");
   body = (___PSTATE->lc_global+1);
   head = *___PSTATE->lc_global;
   len = (head >> 11);
   nan_mark_array(___PSP body, len);
-  printf("Done marking lc_global.\n");
 
   // Mark reachable
-  printf("Marking reachable...\n");
   nan_mark_reachable_from_marked(___PSPNC);
-  printf("Done marking reachable.\n");
 
   if (___CAST(___WORD*,still_objs_to_scan) != 0) {
       printf("Unexpected case after nan phase.\n");
@@ -6294,6 +6285,7 @@ ___PSDKR)
       printf("Unexpected case after nan phase.\n");
       exit(0);
   }
+
 }
 
 ___HIDDEN void garbage_collect_mark_weak_phase
@@ -6414,7 +6406,6 @@ ___SIZE_TS requested_words_still;)
   }
 
 #endif
-
 
   /* Recover processor's stack and heap pointers */
 
