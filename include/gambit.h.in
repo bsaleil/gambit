@@ -8476,6 +8476,7 @@ typedef struct ___processor_state_struct
     ___WORD *heap_limit;
     ___WORD *hp;
     ___WORD *lc_stack;
+    ___WORD *lc_stack_ptr;
     ___WORD *lc_global;
 
     ___WORD r[___NB_GVM_REGS];

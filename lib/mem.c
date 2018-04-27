@@ -6237,17 +6237,13 @@ ___PSDKR)
     } while (___CAST(___WORD*,still_objs_to_scan) != 0);
 }
 
-___HIDDEN void garbage_collect_nan_phase
+___HIDDEN void garbage_collect_lc_phase
    ___P((___PSDNC),
         (___PSVNC)
 ___PSDKR)
 {
   ___PSGET
   ___virtual_machine_state ___vms = ___VMSTATE_FROM_PSTATE(___ps);
-
-  // Check if gc nan phase is needed
-  if (___PSTATE->lc_stack == NULL || ___PSTATE->lc_global == NULL)
-    return;
 
   reached_gc_hash_tables = ___TAG(0,0);
   traverse_weak_refs = 0; /* don't traverse weak references in this phase */
@@ -6261,12 +6257,56 @@ ___PSDKR)
       exit(0);
   }
 
+  // Mark lc stack
+  ___WORD* body = (___PSTATE->lc_stack+1);
+  ___WORD  head = *___PSTATE->lc_stack;
+  ___WORD* stack_ptr = (___PSTATE->lc_stack_ptr);
+  ___WORD  vlen = (head >> 11);
+  ___WORD len = body + vlen - stack_ptr;
+  mark_array(___PSP stack_ptr, len);
+
+  // NOTE: Globals are handled by gambit default gc
+
+  // Mark reachable
+  mark_reachable_from_marked(___PSPNC);
+
+  if (___CAST(___WORD*,still_objs_to_scan) != 0) {
+      printf("Unexpected case after nan phase.\n");
+      exit(0);
+  }
+  if (scan_ptr != alloc_heap_ptr) {
+      printf("Unexpected case after nan phase.\n");
+      exit(0);
+  }
+}
+
+___HIDDEN void garbage_collect_nan_phase
+   ___P((___PSDNC),
+        (___PSVNC)
+___PSDKR)
+{
+  ___PSGET
+  ___virtual_machine_state ___vms = ___VMSTATE_FROM_PSTATE(___ps);
+
+  reached_gc_hash_tables = ___TAG(0,0);
+  traverse_weak_refs = 0; /* don't traverse weak references in this phase */
+
+  if (___CAST(___WORD*,still_objs_to_scan) != 0) {
+      printf("Unexpected case.\n");
+      exit(0);
+  }
+  if (scan_ptr != alloc_heap_ptr) {
+      printf("Unexpected case.\n");
+      exit(0);
+  }
 
   // Mark lc stack
-  ___WORD *body = (___PSTATE->lc_stack+1);
-  ___WORD head = *___PSTATE->lc_stack;
-  ___WORD len = (head >> 11);
-  nan_mark_array(___PSP body, len);
+  ___WORD* body = (___PSTATE->lc_stack+1);
+  ___WORD  head = *___PSTATE->lc_stack;
+  ___WORD* stack_ptr = (___PSTATE->lc_stack_ptr);
+  ___WORD  vlen = (head >> 11);
+  ___WORD len = body + vlen - stack_ptr;
+  nan_mark_array(___PSP stack_ptr, len);
 
   // Mark lc global
   body = (___PSTATE->lc_global+1);
@@ -6285,7 +6325,6 @@ ___PSDKR)
       printf("Unexpected case after nan phase.\n");
       exit(0);
   }
-
 }
 
 ___HIDDEN void garbage_collect_mark_weak_phase
@@ -6442,7 +6481,10 @@ ___SIZE_TS requested_words_still;)
 
 
   /* Process LC objects (nan boxed objects) */
-  garbage_collect_nan_phase(___PSPNC);
+  if (___PSTATE->lc_stack != NULL && ___PSTATE->lc_global != NULL)
+    garbage_collect_nan_phase(___PSPNC);
+  else if (___PSTATE->lc_stack != NULL && ___PSTATE->lc_stack_ptr != NULL)
+    garbage_collect_lc_phase(___PSPNC);
 
   /* Process gc hash tables and free unreachable still objects */
 
