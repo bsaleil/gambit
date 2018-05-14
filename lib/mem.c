@@ -19,6 +19,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define LC_CALLBACK_NONE 0
+#define LC_CALLBACK_FN   1
+#define LC_CALLBACK_CONT 2
+#define LC_CALLBACK_STUB 3
+#define LC_GENERIC_REST  4
 
 /*---------------------------------------------------------------------------*/
 
@@ -5940,8 +5945,6 @@ ___PSDKR)
 #endif
 }
 
-//#define printf(...)
-
 ___HIDDEN void nan_mark_array
    ___P((___PSD
          ___WORD *start,
@@ -6237,6 +6240,27 @@ ___PSDKR)
     } while (___CAST(___WORD*,still_objs_to_scan) != 0);
 }
 
+//#define printf(...)
+
+void mark_lc_frame(___WORD* ptr, ___U64 descriptor, ___U64 len)
+{
+    printf("# Marking frame %llx for %llx elements \n", ptr, len);
+    for (___U64 i=0; i<len; i++)
+    {
+        if ((descriptor & 1) == 0)
+        {
+            printf("    Marking %llx\n", ptr-i);
+            mark_array(___PSP ptr-i,1);
+        }
+        descriptor = descriptor >> 1;
+    }
+}
+
+void print_descriptor(___U64 descriptor)
+{
+    printf("# descriptor %llu (fs == %llu, mask == %llu)\n", descriptor, descriptor & 255, descriptor >>  8);
+}
+
 ___HIDDEN void garbage_collect_lc_phase
    ___P((___PSDNC),
         (___PSVNC)
@@ -6263,12 +6287,127 @@ ___PSDKR)
   ___WORD* stack_ptr = (___PSTATE->lc_stack_ptr);
   ___WORD  vlen = (head >> 11);
   ___WORD len = body + vlen - stack_ptr;
-  mark_array(___PSP stack_ptr, len);
+  ___WORD* stack_lim = body + vlen;
+
+  printf("----------------------------------------------------------------------\n");
+  printf("-- GC \n");
+
+  printf("USE LC DESC: %lld\n", ___PSTATE->lc_stack_usedesc);
+
+  // TODO
+  printf("** stack:\n");
+  printf("+--------------------------------------\n");
+  printf("| rdx -> %p == %llu\n", stack_ptr+0, stack_ptr[0]);
+  printf("+--------------------------------------\n");
+  printf("| r14 -> %p == %llu\n", stack_ptr+1, stack_ptr[1]);
+  printf("+--------------------------------------\n");
+  printf("| r13 -> %p == %llu\n", stack_ptr+2, stack_ptr[2]);
+  printf("+--------------------------------------\n");
+  printf("| r12 -> %p == %llu\n", stack_ptr+3, stack_ptr[3]);
+  printf("+--------------------------------------\n");
+  printf("| r11 -> %p == %llu\n", stack_ptr+4, stack_ptr[4]);
+  printf("+--------------------------------------\n");
+  printf("| r10 -> %p == %llu\n", stack_ptr+5, stack_ptr[5]);
+  printf("+--------------------------------------\n");
+  printf("| rdi -> %p == %llu\n", stack_ptr+6, stack_ptr[6]);
+  printf("+--------------------------------------\n");
+  printf("| rsi -> %p == %llu\n", stack_ptr+7, stack_ptr[7]);
+  printf("+--------------------------------------\n");
+  printf("| r15 -> %p == %llu\n", stack_ptr+8, stack_ptr[8]);
+  printf("+--------------------------------------\n");
+  printf("| rbx -> %p == %llu\n", stack_ptr+9, stack_ptr[9]);
+  printf("+--------------------------------------\n");
+  printf("| rcx -> %p == %llu\n", stack_ptr+10, stack_ptr[10]);
+  printf("+--------------------------------------\n");
+  printf("+--------------------------------------\n");
+  for (int i=0; i<200; i++)
+  {
+      if (stack_ptr+11+i >= stack_lim)
+        break;
+      printf("| %p == %llu\n", stack_ptr+11+i, stack_ptr[11+i]);
+      printf("+--------------------------------------\n");
+  }
+
+  // Mark saved registers
+  printf("Marking registers (sp %p, 11 elements)\n", stack_ptr);
+  mark_array(___PSP stack_ptr, 11);
+  printf("Done\n");
+  stack_ptr += 11;
+
+  // Mark current frame
+  ___U64 desc;
+  if (___PSTATE->lc_stack_usedesc == LC_CALLBACK_FN)
+  {
+      // GC called from lc fn callback, use registered frame descriptor
+      desc = ___PSTATE->lc_stack_desc;
+  }
+  else if (___PSTATE->lc_stack_usedesc == LC_CALLBACK_CONT)
+  {
+      // GC called from lc cont callback, extract cr table from rdx
+      ___WORD* table = stack_ptr[-11];
+      desc = table[1];
+      stack_ptr += (desc & 255)-1;
+  }
+  else if (___PSTATE->lc_stack_usedesc == LC_CALLBACK_STUB)
+  {
+      desc = ___PSTATE->lc_stack_desc;
+      stack_ptr += (desc & 255)-1;
+  }
+  else if (___PSTATE->lc_stack_usedesc == LC_GENERIC_REST)
+  {
+      printf("NYI GENERIC REST CASE\n");
+      exit(0);
+  }
+  else
+  {
+      // GC called from runtime lc allocation, extract descriptor from top of stack
+      desc = stack_ptr[0];
+      stack_ptr += (desc & 255);
+  }
+  ___U64 desc_fs = desc & 255;
+  ___U64 desc_mask = desc >> 8;
+  print_descriptor(desc);
+  // First frame is empty then skip stack scanning
+  if (desc_fs == 0)
+  {
+      printf("NO_SCAN\n");
+      goto no_scan;
+  }
+  mark_lc_frame(stack_ptr, desc_mask, desc_fs);
+
+
+  // ___WORD* body = (___PSTATE->lc_stack+1);
+  // ___WORD  head = *___PSTATE->lc_stack;
+  // ___WORD* stack_ptr = (___PSTATE->lc_stack_ptr);
+  // ___WORD  vlen = (head >> 11);
+  // ___WORD len = body + vlen - stack_ptr;
+  printf("lc_stack_ptr %p\n", (___PSTATE->lc_stack_ptr));
+  printf("lc_stack_bod %p\n", (___PSTATE->lc_stack+1));
+  printf("lc_stack_lim %p\n", body + vlen);
+
+  // Mark other frames
+  while (stack_ptr < (stack_lim - 1))
+  //for (;;)
+  {
+      ___WORD* table = stack_ptr[0];
+      desc = table[1];
+      print_descriptor(desc);
+      desc_fs = desc & 255;
+      desc_mask = desc >> 8;
+      stack_ptr += desc_fs;
+      printf("stack_ptr updated to %p\n", stack_ptr);
+      mark_lc_frame(stack_ptr, desc_mask, desc_fs);
+
+  }
+
+  no_scan:
 
   // NOTE: Globals are handled by gambit default gc
 
   // Mark reachable
+  printf("Before marking reachable.\n");
   mark_reachable_from_marked(___PSPNC);
+  printf("Reachable marked.\n");
 
   if (___CAST(___WORD*,still_objs_to_scan) != 0) {
       printf("Unexpected case after nan phase.\n");
@@ -6472,19 +6611,29 @@ ___SIZE_TS requested_words_still;)
 
   BARRIER();
 
+  if (LC_GC_LOCK == 1)
+  {
+      printf("ERROR: GC blocked by LC but called during callback init phase.\n");
+      exit(0);
+  }
+
+  /* Process LC objects (nan boxed objects) */
+  if (___PSTATE->lc_stack != NULL && ___PSTATE->lc_global != NULL)
+  {
+      printf("ERR\n");
+      exit(0);
+      garbage_collect_nan_phase(___PSPNC);
+  }
+  else if (___PSTATE->lc_stack != NULL && ___PSTATE->lc_stack_ptr != NULL)
+    garbage_collect_lc_phase(___PSPNC);
+
+  BARRIER();
 
   /* Mark the objects that are reachable weakly */
 
   garbage_collect_mark_weak_phase (___PSPNC);
 
   BARRIER();
-
-
-  /* Process LC objects (nan boxed objects) */
-  if (___PSTATE->lc_stack != NULL && ___PSTATE->lc_global != NULL)
-    garbage_collect_nan_phase(___PSPNC);
-  else if (___PSTATE->lc_stack != NULL && ___PSTATE->lc_stack_ptr != NULL)
-    garbage_collect_lc_phase(___PSPNC);
 
   /* Process gc hash tables and free unreachable still objects */
 

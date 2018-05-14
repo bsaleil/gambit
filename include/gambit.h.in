@@ -19,6 +19,8 @@
 #include "config.h"
 #endif
 
+extern unsigned char LC_GC_LOCK;
+
 /*---------------------------------------------------------------------------*/
 
 /*
@@ -8477,6 +8479,8 @@ typedef struct ___processor_state_struct
     ___WORD *hp;
     ___WORD *lc_stack;
     ___WORD *lc_stack_ptr;
+    ___U64  lc_stack_desc;
+    ___U8   lc_stack_usedesc;
     ___WORD *lc_global;
 
     ___WORD r[___NB_GVM_REGS];
