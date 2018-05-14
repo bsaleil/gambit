@@ -19,8 +19,6 @@
 #include "config.h"
 #endif
 
-extern unsigned char LC_GC_LOCK;
-
 /*---------------------------------------------------------------------------*/
 
 /*
@@ -8453,6 +8451,21 @@ typedef struct ___gstate_mem_struct {
 
 /*---------------------------------------------------------------------------*/
 
+/* LC context */
+
+struct LC_CTX {
+    ___U8    gc_lock;
+    ___WORD* lc_stack;
+    ___WORD* lc_stack_ptr;
+    ___U64   lc_stack_desc;
+    ___U8    lc_stack_usedesc;
+    ___WORD* lc_global;
+};
+
+typedef struct LC_CTX LC_CTX;
+
+extern LC_CTX lc_global_ctx;
+
 typedef struct ___processor_state_struct *___processor_state;
 typedef struct ___virtual_machine_state_struct *___virtual_machine_state;
 typedef struct ___global_state_struct *___global_state;
@@ -8477,11 +8490,6 @@ typedef struct ___processor_state_struct
 
     ___WORD *heap_limit;
     ___WORD *hp;
-    ___WORD *lc_stack;
-    ___WORD *lc_stack_ptr;
-    ___U64  lc_stack_desc;
-    ___U8   lc_stack_usedesc;
-    ___WORD *lc_global;
 
     ___WORD r[___NB_GVM_REGS];
     ___WORD pc;

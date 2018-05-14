@@ -22,8 +22,6 @@
 #include "c_intf.h"
 #include "actlog.h"
 
-unsigned char LC_GC_LOCK = 0;
-
 /*---------------------------------------------------------------------------*/
 
 /*
@@ -3297,12 +3295,6 @@ ___virtual_machine_state ___vms;)
 #ifndef ___SINGLE_THREADED_VMS
   ___ps->vmstate = ___vms;
 #endif
-
-  ___ps->lc_stack = NULL;
-  ___ps->lc_stack_ptr = NULL;
-  ___ps->lc_global = NULL;
-  ___ps->lc_stack_desc = 0;
-  ___ps->lc_stack_usedesc = 0;
 
   /*
    * Setup processor's OS specific structures and memory management.

@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+LC_CTX lc_global_ctx = {0,NULL,NULL,0,0,NULL};
+
 #define LC_CALLBACK_NONE 0
 #define LC_CALLBACK_FN   1
 #define LC_CALLBACK_CONT 2
@@ -6282,9 +6284,9 @@ ___PSDKR)
   }
 
   // Mark lc stack
-  ___WORD* body = (___PSTATE->lc_stack+1);
-  ___WORD  head = *___PSTATE->lc_stack;
-  ___WORD* stack_ptr = (___PSTATE->lc_stack_ptr);
+  ___WORD* body = (lc_global_ctx.lc_stack+1);
+  ___WORD  head = *lc_global_ctx.lc_stack;
+  ___WORD* stack_ptr = (lc_global_ctx.lc_stack_ptr);
   ___WORD  vlen = (head >> 11);
   ___WORD len = body + vlen - stack_ptr;
   ___WORD* stack_lim = body + vlen;
@@ -6292,7 +6294,7 @@ ___PSDKR)
   printf("----------------------------------------------------------------------\n");
   printf("-- GC \n");
 
-  printf("USE LC DESC: %lld\n", ___PSTATE->lc_stack_usedesc);
+  printf("USE LC DESC: %lld\n", lc_global_ctx.lc_stack_usedesc);
 
   // TODO
   printf("** stack:\n");
@@ -6336,24 +6338,24 @@ ___PSDKR)
 
   // Mark current frame
   ___U64 desc;
-  if (___PSTATE->lc_stack_usedesc == LC_CALLBACK_FN)
+  if (lc_global_ctx.lc_stack_usedesc == LC_CALLBACK_FN)
   {
       // GC called from lc fn callback, use registered frame descriptor
-      desc = ___PSTATE->lc_stack_desc;
+      desc = lc_global_ctx.lc_stack_desc;
   }
-  else if (___PSTATE->lc_stack_usedesc == LC_CALLBACK_CONT)
+  else if (lc_global_ctx.lc_stack_usedesc == LC_CALLBACK_CONT)
   {
       // GC called from lc cont callback, extract cr table from rdx
       ___WORD* table = stack_ptr[-11];
       desc = table[1];
       stack_ptr += (desc & 255)-1;
   }
-  else if (___PSTATE->lc_stack_usedesc == LC_CALLBACK_STUB)
+  else if (lc_global_ctx.lc_stack_usedesc == LC_CALLBACK_STUB)
   {
-      desc = ___PSTATE->lc_stack_desc;
+      desc = lc_global_ctx.lc_stack_desc;
       stack_ptr += (desc & 255)-1;
   }
-  else if (___PSTATE->lc_stack_usedesc == LC_GENERIC_REST)
+  else if (lc_global_ctx.lc_stack_usedesc == LC_GENERIC_REST)
   {
       printf("NYI GENERIC REST CASE\n");
       exit(0);
@@ -6376,13 +6378,13 @@ ___PSDKR)
   mark_lc_frame(stack_ptr, desc_mask, desc_fs);
 
 
-  // ___WORD* body = (___PSTATE->lc_stack+1);
-  // ___WORD  head = *___PSTATE->lc_stack;
-  // ___WORD* stack_ptr = (___PSTATE->lc_stack_ptr);
+  // ___WORD* body = (lc_global_ctx.lc_stack+1);
+  // ___WORD  head = *lc_global_ctx.lc_stack;
+  // ___WORD* stack_ptr = (lc_global_ctx.lc_stack_ptr);
   // ___WORD  vlen = (head >> 11);
   // ___WORD len = body + vlen - stack_ptr;
-  printf("lc_stack_ptr %p\n", (___PSTATE->lc_stack_ptr));
-  printf("lc_stack_bod %p\n", (___PSTATE->lc_stack+1));
+  printf("lc_stack_ptr %p\n", (lc_global_ctx.lc_stack_ptr));
+  printf("lc_stack_bod %p\n", (lc_global_ctx.lc_stack+1));
   printf("lc_stack_lim %p\n", body + vlen);
 
   // Mark other frames
@@ -6440,16 +6442,16 @@ ___PSDKR)
   }
 
   // Mark lc stack
-  ___WORD* body = (___PSTATE->lc_stack+1);
-  ___WORD  head = *___PSTATE->lc_stack;
-  ___WORD* stack_ptr = (___PSTATE->lc_stack_ptr);
+  ___WORD* body = (lc_global_ctx.lc_stack+1);
+  ___WORD  head = *lc_global_ctx.lc_stack;
+  ___WORD* stack_ptr = (lc_global_ctx.lc_stack_ptr);
   ___WORD  vlen = (head >> 11);
   ___WORD len = body + vlen - stack_ptr;
   nan_mark_array(___PSP stack_ptr, len);
 
   // Mark lc global
-  body = (___PSTATE->lc_global+1);
-  head = *___PSTATE->lc_global;
+  body = (lc_global_ctx.lc_global+1);
+  head = *lc_global_ctx.lc_global;
   len = (head >> 11);
   nan_mark_array(___PSP body, len);
 
@@ -6611,20 +6613,20 @@ ___SIZE_TS requested_words_still;)
 
   BARRIER();
 
-  if (LC_GC_LOCK == 1)
+  if (lc_global_ctx.gc_lock == 1)
   {
       printf("ERROR: GC blocked by LC but called during callback init phase.\n");
       exit(0);
   }
 
   /* Process LC objects (nan boxed objects) */
-  if (___PSTATE->lc_stack != NULL && ___PSTATE->lc_global != NULL)
+  if (lc_global_ctx.lc_stack != NULL && lc_global_ctx.lc_global != NULL)
   {
       printf("ERR\n");
       exit(0);
       garbage_collect_nan_phase(___PSPNC);
   }
-  else if (___PSTATE->lc_stack != NULL && ___PSTATE->lc_stack_ptr != NULL)
+  else if (lc_global_ctx.lc_stack != NULL && lc_global_ctx.lc_stack_ptr != NULL)
     garbage_collect_lc_phase(___PSPNC);
 
   BARRIER();
