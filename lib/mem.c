@@ -6242,16 +6242,17 @@ ___PSDKR)
     } while (___CAST(___WORD*,still_objs_to_scan) != 0);
 }
 
-//#define printf(...)
+#define log(...)
+//#define log(...) printf(__VA_ARGS__)
 
 void mark_lc_frame(___WORD* ptr, ___U64 descriptor, ___U64 len)
 {
-    printf("# Marking frame %llx for %llx elements \n", ptr, len);
+    log("# Marking frame %llx for %llx elements \n", ptr, len);
     for (___U64 i=0; i<len; i++)
     {
         if ((descriptor & 1) == 0)
         {
-            printf("    Marking %llx\n", ptr-i);
+            log("    Marking %llx\n", ptr-i);
             mark_array(___PSP ptr-i,1);
         }
         descriptor = descriptor >> 1;
@@ -6260,7 +6261,7 @@ void mark_lc_frame(___WORD* ptr, ___U64 descriptor, ___U64 len)
 
 void print_descriptor(___U64 descriptor)
 {
-    printf("# descriptor %llu (fs == %llu, mask == %llu)\n", descriptor, descriptor & 255, descriptor >>  8);
+    log("# descriptor %llu (fs == %llu, mask == %llu)\n", descriptor, descriptor & 255, descriptor >>  8);
 }
 
 ___HIDDEN void garbage_collect_lc_phase
@@ -6291,49 +6292,49 @@ ___PSDKR)
   ___WORD len = body + vlen - stack_ptr;
   ___WORD* stack_lim = body + vlen;
 
-  printf("----------------------------------------------------------------------\n");
-  printf("-- GC \n");
+  log("----------------------------------------------------------------------\n");
+  log("-- GC \n");
 
-  printf("USE LC DESC: %lld\n", lc_global_ctx.lc_stack_usedesc);
+  log("USE LC DESC: %lld\n", lc_global_ctx.lc_stack_usedesc);
 
   // TODO
-  printf("** stack:\n");
-  printf("+--------------------------------------\n");
-  printf("| rdx -> %p == %llu\n", stack_ptr+0, stack_ptr[0]);
-  printf("+--------------------------------------\n");
-  printf("| r14 -> %p == %llu\n", stack_ptr+1, stack_ptr[1]);
-  printf("+--------------------------------------\n");
-  printf("| r13 -> %p == %llu\n", stack_ptr+2, stack_ptr[2]);
-  printf("+--------------------------------------\n");
-  printf("| r12 -> %p == %llu\n", stack_ptr+3, stack_ptr[3]);
-  printf("+--------------------------------------\n");
-  printf("| r11 -> %p == %llu\n", stack_ptr+4, stack_ptr[4]);
-  printf("+--------------------------------------\n");
-  printf("| r10 -> %p == %llu\n", stack_ptr+5, stack_ptr[5]);
-  printf("+--------------------------------------\n");
-  printf("| rdi -> %p == %llu\n", stack_ptr+6, stack_ptr[6]);
-  printf("+--------------------------------------\n");
-  printf("| rsi -> %p == %llu\n", stack_ptr+7, stack_ptr[7]);
-  printf("+--------------------------------------\n");
-  printf("| r15 -> %p == %llu\n", stack_ptr+8, stack_ptr[8]);
-  printf("+--------------------------------------\n");
-  printf("| rbx -> %p == %llu\n", stack_ptr+9, stack_ptr[9]);
-  printf("+--------------------------------------\n");
-  printf("| rcx -> %p == %llu\n", stack_ptr+10, stack_ptr[10]);
-  printf("+--------------------------------------\n");
-  printf("+--------------------------------------\n");
+  log("** stack:\n");
+  log("+--------------------------------------\n");
+  log("| rdx -> %p == %llu\n", stack_ptr+0, stack_ptr[0]);
+  log("+--------------------------------------\n");
+  log("| r14 -> %p == %llu\n", stack_ptr+1, stack_ptr[1]);
+  log("+--------------------------------------\n");
+  log("| r13 -> %p == %llu\n", stack_ptr+2, stack_ptr[2]);
+  log("+--------------------------------------\n");
+  log("| r12 -> %p == %llu\n", stack_ptr+3, stack_ptr[3]);
+  log("+--------------------------------------\n");
+  log("| r11 -> %p == %llu\n", stack_ptr+4, stack_ptr[4]);
+  log("+--------------------------------------\n");
+  log("| r10 -> %p == %llu\n", stack_ptr+5, stack_ptr[5]);
+  log("+--------------------------------------\n");
+  log("| rdi -> %p == %llu\n", stack_ptr+6, stack_ptr[6]);
+  log("+--------------------------------------\n");
+  log("| rsi -> %p == %llu\n", stack_ptr+7, stack_ptr[7]);
+  log("+--------------------------------------\n");
+  log("| r15 -> %p == %llu\n", stack_ptr+8, stack_ptr[8]);
+  log("+--------------------------------------\n");
+  log("| rbx -> %p == %llu\n", stack_ptr+9, stack_ptr[9]);
+  log("+--------------------------------------\n");
+  log("| rcx -> %p == %llu\n", stack_ptr+10, stack_ptr[10]);
+  log("+--------------------------------------\n");
+  log("+--------------------------------------\n");
   for (int i=0; i<200; i++)
   {
       if (stack_ptr+11+i >= stack_lim)
         break;
-      printf("| %p == %llu\n", stack_ptr+11+i, stack_ptr[11+i]);
-      printf("+--------------------------------------\n");
+      log("| %p == %llu\n", stack_ptr+11+i, stack_ptr[11+i]);
+      log("+--------------------------------------\n");
   }
 
   // Mark saved registers
-  printf("Marking registers (sp %p, 11 elements)\n", stack_ptr);
+  log("Marking registers (sp %p, 11 elements)\n", stack_ptr);
   mark_array(___PSP stack_ptr, 11);
-  printf("Done\n");
+  log("Done\n");
   stack_ptr += 11;
 
   // Mark current frame
@@ -6357,8 +6358,8 @@ ___PSDKR)
   }
   else if (lc_global_ctx.lc_stack_usedesc == LC_GENERIC_REST)
   {
-      printf("NYI GENERIC REST CASE\n");
-      exit(0);
+      desc = (stack_ptr[1] >> 2)+1;
+      stack_ptr += (desc & 255)+1;
   }
   else
   {
@@ -6372,7 +6373,7 @@ ___PSDKR)
   // First frame is empty then skip stack scanning
   if (desc_fs == 0)
   {
-      printf("NO_SCAN\n");
+      log("NO_SCAN\n");
       goto no_scan;
   }
   mark_lc_frame(stack_ptr, desc_mask, desc_fs);
@@ -6383,9 +6384,9 @@ ___PSDKR)
   // ___WORD* stack_ptr = (lc_global_ctx.lc_stack_ptr);
   // ___WORD  vlen = (head >> 11);
   // ___WORD len = body + vlen - stack_ptr;
-  printf("lc_stack_ptr %p\n", (lc_global_ctx.lc_stack_ptr));
-  printf("lc_stack_bod %p\n", (lc_global_ctx.lc_stack+1));
-  printf("lc_stack_lim %p\n", body + vlen);
+  log("lc_stack_ptr %p\n", (lc_global_ctx.lc_stack_ptr));
+  log("lc_stack_bod %p\n", (lc_global_ctx.lc_stack+1));
+  log("lc_stack_lim %p\n", body + vlen);
 
   // Mark other frames
   while (stack_ptr < (stack_lim - 1))
@@ -6397,7 +6398,7 @@ ___PSDKR)
       desc_fs = desc & 255;
       desc_mask = desc >> 8;
       stack_ptr += desc_fs;
-      printf("stack_ptr updated to %p\n", stack_ptr);
+      log("stack_ptr updated to %p\n", stack_ptr);
       mark_lc_frame(stack_ptr, desc_mask, desc_fs);
 
   }
@@ -6407,9 +6408,9 @@ ___PSDKR)
   // NOTE: Globals are handled by gambit default gc
 
   // Mark reachable
-  printf("Before marking reachable.\n");
+  log("Before marking reachable.\n");
   mark_reachable_from_marked(___PSPNC);
-  printf("Reachable marked.\n");
+  log("Reachable marked.\n");
 
   if (___CAST(___WORD*,still_objs_to_scan) != 0) {
       printf("Unexpected case after nan phase.\n");
@@ -6419,6 +6420,10 @@ ___PSDKR)
       printf("Unexpected case after nan phase.\n");
       exit(0);
   }
+
+  // Reset usedesc variable to LC_CALLBACK_NONE for next GCs
+  if (lc_global_ctx.lc_stack_usedesc == LC_GENERIC_REST)
+    lc_global_ctx.lc_stack_usedesc = LC_CALLBACK_NONE;
 }
 
 ___HIDDEN void garbage_collect_nan_phase
@@ -6619,15 +6624,18 @@ ___SIZE_TS requested_words_still;)
       exit(0);
   }
 
+  log("GC...\n");
+  log("stack %p\n", lc_global_ctx.lc_stack);
+  log("stack_ptr %p\n", lc_global_ctx.lc_stack_ptr);
+
   /* Process LC objects (nan boxed objects) */
-  if (lc_global_ctx.lc_stack != NULL && lc_global_ctx.lc_global != NULL)
+  if (lc_global_ctx.lc_stack != NULL && lc_global_ctx.lc_stack_ptr != NULL)
   {
-      printf("ERR\n");
-      exit(0);
-      garbage_collect_nan_phase(___PSPNC);
+      if (lc_global_ctx.lc_global != NULL)
+        garbage_collect_nan_phase(___PSPNC);
+      else
+        garbage_collect_lc_phase(___PSPNC);
   }
-  else if (lc_global_ctx.lc_stack != NULL && lc_global_ctx.lc_stack_ptr != NULL)
-    garbage_collect_lc_phase(___PSPNC);
 
   BARRIER();
 
