@@ -22,6 +22,9 @@
 #include "c_intf.h"
 #include "actlog.h"
 
+unsigned long long int GLOBAL_CPT_UNBOX = 0;
+unsigned long long int GLOBAL_CPT_BOX = 0;
+
 /*---------------------------------------------------------------------------*/
 
 /*
@@ -4696,6 +4699,9 @@ ___setup_params_struct *setup_params;)
   /*
    * Cleanup if there are any errors.
    */
+
+   printf("Flonum boxing operations: %llu\n", GLOBAL_CPT_BOX);
+   printf("Flonum unboxing operations: %llu\n", GLOBAL_CPT_UNBOX);
 
   if (err != ___FIX(___NO_ERR))
     ___cleanup ();

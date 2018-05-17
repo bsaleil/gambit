@@ -2339,10 +2339,14 @@ ___hp = ___CAST(___WORD*, (___CAST(___WORD,___hp) + (((n)<<___LWS) + 7)) & ~7)
 
 #define ___FLONUM_VAL(obj) *___CAST(___F64*,___BODY_AS(obj,___tSUBTYPED))
 
-#define ___F64UNBOX(x) ___FLONUM_VAL(x)
+extern unsigned long long int GLOBAL_CPT_UNBOX;
+extern unsigned long long int GLOBAL_CPT_BOX;
+
+#define ___F64UNBOX(x) ( GLOBAL_CPT_UNBOX++, ___FLONUM_VAL(x) )
 
 #define ___F64BOX(x) \
-(___ALLOC_ALIGN64(1+___FLONUM_SIZE), \
+(GLOBAL_CPT_BOX++, \
+ ___ALLOC_ALIGN64(1+___FLONUM_SIZE), \
  ___hp[-(1+___FLONUM_SIZE)] = ___MAKE_HD_WORDS(___FLONUM_SIZE,___sFLONUM), \
  *___CAST(___F64*,___hp-___FLONUM_SIZE) = (x), \
  ___TAG((___hp-(1+___FLONUM_SIZE)),___tSUBTYPED))
