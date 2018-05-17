@@ -27,6 +27,8 @@ LC_CTX lc_global_ctx = {0,NULL,NULL,0,0,NULL};
 #define LC_CALLBACK_STUB 3
 #define LC_GENERIC_REST  4
 
+//#define LC_DEBUG
+
 /*---------------------------------------------------------------------------*/
 
 #ifdef ___DEBUG_GARBAGE_COLLECT
@@ -6242,26 +6244,69 @@ ___PSDKR)
     } while (___CAST(___WORD*,still_objs_to_scan) != 0);
 }
 
-#define log(...)
-//#define log(...) printf(__VA_ARGS__)
+
+#ifdef LC_DEBUG
+
+    #define lc_log(...) printf(__VA_ARGS__)
+
+    void print_lc_descriptor(___U64 descriptor)
+    {
+        lc_log("# descriptor %llu (fs == %llu, mask == %llu)\n", descriptor, descriptor & 255, descriptor >>  8);
+    }
+
+    void print_lc_stack(___WORD* stack_ptr, ___WORD* stack_lim)
+    {
+        lc_log("** stack:\n");
+        lc_log("+--------------------------------------\n");
+        lc_log("| rdx -> %p == %llu\n", stack_ptr+0, stack_ptr[0]);
+        lc_log("+--------------------------------------\n");
+        lc_log("| r14 -> %p == %llu\n", stack_ptr+1, stack_ptr[1]);
+        lc_log("+--------------------------------------\n");
+        lc_log("| r13 -> %p == %llu\n", stack_ptr+2, stack_ptr[2]);
+        lc_log("+--------------------------------------\n");
+        lc_log("| r12 -> %p == %llu\n", stack_ptr+3, stack_ptr[3]);
+        lc_log("+--------------------------------------\n");
+        lc_log("| r11 -> %p == %llu\n", stack_ptr+4, stack_ptr[4]);
+        lc_log("+--------------------------------------\n");
+        lc_log("| r10 -> %p == %llu\n", stack_ptr+5, stack_ptr[5]);
+        lc_log("+--------------------------------------\n");
+        lc_log("| rdi -> %p == %llu\n", stack_ptr+6, stack_ptr[6]);
+        lc_log("+--------------------------------------\n");
+        lc_log("| rsi -> %p == %llu\n", stack_ptr+7, stack_ptr[7]);
+        lc_log("+--------------------------------------\n");
+        lc_log("| r15 -> %p == %llu\n", stack_ptr+8, stack_ptr[8]);
+        lc_log("+--------------------------------------\n");
+        lc_log("| rbx -> %p == %llu\n", stack_ptr+9, stack_ptr[9]);
+        lc_log("+--------------------------------------\n");
+        lc_log("| rcx -> %p == %llu\n", stack_ptr+10, stack_ptr[10]);
+        lc_log("+--------------------------------------\n");
+        lc_log("+--------------------------------------\n");
+        for (int i=0; i<200; i++)
+        {
+            if (stack_ptr+11+i >= stack_lim)
+              break;
+            lc_log("| %p == %llu\n", stack_ptr+11+i, stack_ptr[11+i]);
+            lc_log("+--------------------------------------\n");
+        }
+    }
+#else
+    #define lc_log(...)
+    #define print_lc_descriptor(...)
+    #define print_lc_stack(...)
+#endif
 
 void mark_lc_frame(___WORD* ptr, ___U64 descriptor, ___U64 len)
 {
-    log("# Marking frame %llx for %llx elements \n", ptr, len);
+    lc_log("# Marking frame %llx for %llx elements \n", ptr, len);
     for (___U64 i=0; i<len; i++)
     {
         if ((descriptor & 1) == 0)
         {
-            log("    Marking %llx\n", ptr-i);
+            lc_log("    Marking %llx\n", ptr-i);
             mark_array(___PSP ptr-i,1);
         }
         descriptor = descriptor >> 1;
     }
-}
-
-void print_descriptor(___U64 descriptor)
-{
-    log("# descriptor %llu (fs == %llu, mask == %llu)\n", descriptor, descriptor & 255, descriptor >>  8);
 }
 
 ___HIDDEN void garbage_collect_lc_phase
@@ -6275,16 +6320,7 @@ ___PSDKR)
   reached_gc_hash_tables = ___TAG(0,0);
   traverse_weak_refs = 0; /* don't traverse weak references in this phase */
 
-  if (___CAST(___WORD*,still_objs_to_scan) != 0) {
-      printf("Unexpected case.\n");
-      exit(0);
-  }
-  if (scan_ptr != alloc_heap_ptr) {
-      printf("Unexpected case.\n");
-      exit(0);
-  }
-
-  // Mark lc stack
+  // Get stack info from global lc ctx
   ___WORD* body = (lc_global_ctx.lc_stack+1);
   ___WORD  head = *lc_global_ctx.lc_stack;
   ___WORD* stack_ptr = (lc_global_ctx.lc_stack_ptr);
@@ -6292,90 +6328,61 @@ ___PSDKR)
   ___WORD len = body + vlen - stack_ptr;
   ___WORD* stack_lim = body + vlen;
 
-  log("----------------------------------------------------------------------\n");
-  log("-- GC \n");
-
-  log("USE LC DESC: %lld\n", lc_global_ctx.lc_stack_usedesc);
-
-  // TODO
-  log("** stack:\n");
-  log("+--------------------------------------\n");
-  log("| rdx -> %p == %llu\n", stack_ptr+0, stack_ptr[0]);
-  log("+--------------------------------------\n");
-  log("| r14 -> %p == %llu\n", stack_ptr+1, stack_ptr[1]);
-  log("+--------------------------------------\n");
-  log("| r13 -> %p == %llu\n", stack_ptr+2, stack_ptr[2]);
-  log("+--------------------------------------\n");
-  log("| r12 -> %p == %llu\n", stack_ptr+3, stack_ptr[3]);
-  log("+--------------------------------------\n");
-  log("| r11 -> %p == %llu\n", stack_ptr+4, stack_ptr[4]);
-  log("+--------------------------------------\n");
-  log("| r10 -> %p == %llu\n", stack_ptr+5, stack_ptr[5]);
-  log("+--------------------------------------\n");
-  log("| rdi -> %p == %llu\n", stack_ptr+6, stack_ptr[6]);
-  log("+--------------------------------------\n");
-  log("| rsi -> %p == %llu\n", stack_ptr+7, stack_ptr[7]);
-  log("+--------------------------------------\n");
-  log("| r15 -> %p == %llu\n", stack_ptr+8, stack_ptr[8]);
-  log("+--------------------------------------\n");
-  log("| rbx -> %p == %llu\n", stack_ptr+9, stack_ptr[9]);
-  log("+--------------------------------------\n");
-  log("| rcx -> %p == %llu\n", stack_ptr+10, stack_ptr[10]);
-  log("+--------------------------------------\n");
-  log("+--------------------------------------\n");
-  for (int i=0; i<200; i++)
-  {
-      if (stack_ptr+11+i >= stack_lim)
-        break;
-      log("| %p == %llu\n", stack_ptr+11+i, stack_ptr[11+i]);
-      log("+--------------------------------------\n");
-  }
+  lc_log("-- GC \n");
+  lc_log("USE LC DESC: %lld\n", lc_global_ctx.lc_stack_usedesc);
+  print_lc_stack(stack_ptr,stack_lim);
 
   // Mark saved registers
-  log("Marking registers (sp %p, 11 elements)\n", stack_ptr);
   mark_array(___PSP stack_ptr, 11);
-  log("Done\n");
   stack_ptr += 11;
 
-  // Mark current frame
+  // Mark first frame
   ___U64 desc;
-  if (lc_global_ctx.lc_stack_usedesc == LC_CALLBACK_FN)
+  switch (lc_global_ctx.lc_stack_usedesc)
   {
-      // GC called from lc fn callback, use registered frame descriptor
-      desc = lc_global_ctx.lc_stack_desc;
-  }
-  else if (lc_global_ctx.lc_stack_usedesc == LC_CALLBACK_CONT)
-  {
-      // GC called from lc cont callback, extract cr table from rdx
-      ___WORD* table = stack_ptr[-11];
-      desc = table[1];
-      stack_ptr += (desc & 255)-1;
-  }
-  else if (lc_global_ctx.lc_stack_usedesc == LC_CALLBACK_STUB)
-  {
-      desc = lc_global_ctx.lc_stack_desc;
-      stack_ptr += (desc & 255)-1;
-  }
-  else if (lc_global_ctx.lc_stack_usedesc == LC_GENERIC_REST)
-  {
-      desc = (stack_ptr[1] >> 2)+1;
-      stack_ptr += (desc & 255)+1;
-  }
-  else
-  {
-      // GC called from runtime lc allocation, extract descriptor from top of stack
-      desc = stack_ptr[0];
-      stack_ptr += (desc & 255);
+      case LC_CALLBACK_FN:
+      {
+          // GC called from lc fn callback, use registered frame descriptor
+          desc = lc_global_ctx.lc_stack_desc;
+          break;
+      }
+      case LC_CALLBACK_CONT:
+      {
+          // GC called from lc cont callback, extract cr table from rdx
+          ___WORD* table = stack_ptr[-11];
+          desc = table[1];
+          stack_ptr += (desc & 255)-1;
+          break;
+      }
+      case LC_CALLBACK_STUB:
+      {
+          // GC called from stub callback, use registered frame descriptor
+          desc = lc_global_ctx.lc_stack_desc;
+          stack_ptr += (desc & 255)-1;
+          break;
+      }
+      case LC_GENERIC_REST:
+      {
+          // GC called from generic rest param allocation, use pushed encoded fs as descriptor
+          desc = (stack_ptr[1] >> 2)+1;
+          stack_ptr += (desc & 255)+1;
+          // Reset usedesc variable to LC_CALLBACK_NONE for next GCs
+          lc_global_ctx.lc_stack_usedesc = LC_CALLBACK_NONE;
+          break;
+      }
+      default:
+      {
+          // GC called from runtime lc allocation, extract descriptor from top of stack
+          desc = stack_ptr[0];
+          stack_ptr += (desc & 255);
+      }
   }
   ___U64 desc_fs = desc & 255;
   ___U64 desc_mask = desc >> 8;
-  print_descriptor(desc);
+  print_lc_descriptor(desc);
   // First frame is empty then skip stack scanning
   if (desc_fs == 0)
-  {
-      log("NO_SCAN\n");
       goto no_scan;
-  }
   mark_lc_frame(stack_ptr, desc_mask, desc_fs);
 
 
@@ -6384,23 +6391,20 @@ ___PSDKR)
   // ___WORD* stack_ptr = (lc_global_ctx.lc_stack_ptr);
   // ___WORD  vlen = (head >> 11);
   // ___WORD len = body + vlen - stack_ptr;
-  log("lc_stack_ptr %p\n", (lc_global_ctx.lc_stack_ptr));
-  log("lc_stack_bod %p\n", (lc_global_ctx.lc_stack+1));
-  log("lc_stack_lim %p\n", body + vlen);
+  lc_log("lc_stack_ptr %p\n", (lc_global_ctx.lc_stack_ptr));
+  lc_log("lc_stack_bod %p\n", (lc_global_ctx.lc_stack+1));
+  lc_log("lc_stack_lim %p\n", body + vlen);
 
   // Mark other frames
   while (stack_ptr < (stack_lim - 1))
-  //for (;;)
   {
       ___WORD* table = stack_ptr[0];
       desc = table[1];
-      print_descriptor(desc);
+      print_lc_descriptor(desc);
       desc_fs = desc & 255;
       desc_mask = desc >> 8;
       stack_ptr += desc_fs;
-      log("stack_ptr updated to %p\n", stack_ptr);
       mark_lc_frame(stack_ptr, desc_mask, desc_fs);
-
   }
 
   no_scan:
@@ -6408,22 +6412,7 @@ ___PSDKR)
   // NOTE: Globals are handled by gambit default gc
 
   // Mark reachable
-  log("Before marking reachable.\n");
   mark_reachable_from_marked(___PSPNC);
-  log("Reachable marked.\n");
-
-  if (___CAST(___WORD*,still_objs_to_scan) != 0) {
-      printf("Unexpected case after nan phase.\n");
-      exit(0);
-  }
-  if (scan_ptr != alloc_heap_ptr) {
-      printf("Unexpected case after nan phase.\n");
-      exit(0);
-  }
-
-  // Reset usedesc variable to LC_CALLBACK_NONE for next GCs
-  if (lc_global_ctx.lc_stack_usedesc == LC_GENERIC_REST)
-    lc_global_ctx.lc_stack_usedesc = LC_CALLBACK_NONE;
 }
 
 ___HIDDEN void garbage_collect_nan_phase
@@ -6436,15 +6425,6 @@ ___PSDKR)
 
   reached_gc_hash_tables = ___TAG(0,0);
   traverse_weak_refs = 0; /* don't traverse weak references in this phase */
-
-  if (___CAST(___WORD*,still_objs_to_scan) != 0) {
-      printf("Unexpected case.\n");
-      exit(0);
-  }
-  if (scan_ptr != alloc_heap_ptr) {
-      printf("Unexpected case.\n");
-      exit(0);
-  }
 
   // Mark lc stack
   ___WORD* body = (lc_global_ctx.lc_stack+1);
@@ -6462,15 +6442,6 @@ ___PSDKR)
 
   // Mark reachable
   nan_mark_reachable_from_marked(___PSPNC);
-
-  if (___CAST(___WORD*,still_objs_to_scan) != 0) {
-      printf("Unexpected case after nan phase.\n");
-      exit(0);
-  }
-  if (scan_ptr != alloc_heap_ptr) {
-      printf("Unexpected case after nan phase.\n");
-      exit(0);
-  }
 }
 
 ___HIDDEN void garbage_collect_mark_weak_phase
@@ -6623,10 +6594,6 @@ ___SIZE_TS requested_words_still;)
       printf("ERROR: GC blocked by LC but called during callback init phase.\n");
       exit(0);
   }
-
-  log("GC...\n");
-  log("stack %p\n", lc_global_ctx.lc_stack);
-  log("stack_ptr %p\n", lc_global_ctx.lc_stack_ptr);
 
   /* Process LC objects (nan boxed objects) */
   if (lc_global_ctx.lc_stack != NULL && lc_global_ctx.lc_stack_ptr != NULL)
