@@ -6333,7 +6333,7 @@ ___PSDKR)
   print_lc_stack(stack_ptr,stack_lim);
 
   // Mark saved registers
-  mark_array(___PSP stack_ptr, 10);
+  mark_array(___PSP stack_ptr, 11);
   stack_ptr += 11;
 
   // Mark first frame
