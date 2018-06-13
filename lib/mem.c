@@ -6589,9 +6589,10 @@ ___SIZE_TS requested_words_still;)
 
   BARRIER();
 
-  if (lc_global_ctx.gc_lock == 1)
+  if (lc_global_ctx.gc_lock != 0)
   {
       printf("ERROR: GC blocked by LC but called during callback init phase.\n");
+      printf("       Locked by %llu\n", lc_global_ctx.gc_lock);
       exit(0);
   }
 
