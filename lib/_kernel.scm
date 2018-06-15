@@ -4029,7 +4029,7 @@ end-of-code
 
    ___FRAME_STORE_RA(___R0)
    ___W_ALL
-   result = ___EXT(___alloc_scmobj) (___ps, ___sF64VECTOR, 20<<3);
+   result = ___EXT(___alloc_scmobj) (NULL, ___sF64VECTOR, 20<<3);
    ___R_ALL
    ___SET_R0(___FRAME_FETCH_RA)
 
@@ -4061,7 +4061,7 @@ end-of-code
       ___F64VECTORSET(result,___FIX(18),___vms->mem.latest_gc_movable_)
       ___F64VECTORSET(result,___FIX(19),___vms->mem.latest_gc_still_)
 
-      ___still_obj_refcount_dec (result);
+      //___still_obj_refcount_dec (result);
    }
 
    ___RESULT = result;
