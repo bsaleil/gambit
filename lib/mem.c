@@ -6314,10 +6314,11 @@ ___HIDDEN void garbage_collect_lc_phase
         (___PSVNC)
 ___PSDKR)
 {
+
   ___PSGET
   ___virtual_machine_state ___vms = ___VMSTATE_FROM_PSTATE(___ps);
 
-  reached_gc_hash_tables = ___TAG(0,0);
+  //reached_gc_hash_tables = ___TAG(0,0);
   traverse_weak_refs = 0; /* don't traverse weak references in this phase */
 
   // Get stack info from global lc ctx
@@ -6366,8 +6367,6 @@ ___PSDKR)
           // GC called from generic rest param allocation, use pushed encoded fs as descriptor
           desc = (stack_ptr[1] >> 2)+1;
           stack_ptr += (desc & 255)+1;
-          // Reset usedesc variable to LC_CALLBACK_NONE for next GCs
-          lc_global_ctx.lc_stack_usedesc = LC_CALLBACK_NONE;
           break;
       }
       default:
@@ -6381,10 +6380,10 @@ ___PSDKR)
   ___U64 desc_mask = desc >> 8;
   print_lc_descriptor(desc);
   // First frame is empty then skip stack scanning
-  if (desc_fs == 0)
-      goto no_scan;
   mark_lc_frame(stack_ptr, desc_mask, desc_fs);
 
+  if (desc_fs == 0)
+    stack_ptr += 1;
 
   // ___WORD* body = (lc_global_ctx.lc_stack+1);
   // ___WORD  head = *lc_global_ctx.lc_stack;
@@ -6400,6 +6399,7 @@ ___PSDKR)
   {
       ___WORD* table = stack_ptr[0];
       desc = table[1];
+      lc_log("reading descriptor at %p\n", (stack_ptr));
       print_lc_descriptor(desc);
       desc_fs = desc & 255;
       desc_mask = desc >> 8;
@@ -6407,12 +6407,13 @@ ___PSDKR)
       mark_lc_frame(stack_ptr, desc_mask, desc_fs);
   }
 
-  no_scan:
-
   // NOTE: Globals are handled by gambit default gc
 
   // Mark reachable
   mark_reachable_from_marked(___PSPNC);
+
+  // Reset usedesc variable to LC_CALLBACK_NONE for next GCs
+  lc_global_ctx.lc_stack_usedesc = LC_CALLBACK_NONE;
 }
 
 ___HIDDEN void garbage_collect_nan_phase
@@ -6423,7 +6424,7 @@ ___PSDKR)
   ___PSGET
   ___virtual_machine_state ___vms = ___VMSTATE_FROM_PSTATE(___ps);
 
-  reached_gc_hash_tables = ___TAG(0,0);
+  //reached_gc_hash_tables = ___TAG(0,0);
   traverse_weak_refs = 0; /* don't traverse weak references in this phase */
 
   // Mark lc stack
