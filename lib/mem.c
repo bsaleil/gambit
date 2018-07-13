@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-LC_CTX lc_global_ctx = {0,NULL,NULL,0,0,NULL};
+LC_CTX lc_global_ctx = {0,NULL,NULL,0,0,NULL,NULL,NULL,0};
 
 #define LC_CALLBACK_NONE 0
 #define LC_CALLBACK_FN   1
@@ -6394,13 +6394,36 @@ ___PSDKR)
   lc_log("lc_stack_bod %p\n", (lc_global_ctx.lc_stack+1));
   lc_log("lc_stack_lim %p\n", body + vlen);
 
+  lc_log("lc_stubs_begin %p\n", lc_global_ctx.lc_stubs_begin);
+  lc_log("lc_stubs_end %p\n", lc_global_ctx.lc_stubs_end);
+
   // Mark other frames
   while (stack_ptr < (stack_lim - 1))
   {
       ___WORD* table = stack_ptr[0];
-      desc = table[1];
+
+      if (lc_global_ctx.lc_intraprocedural)
+      {
+          if (table >= lc_global_ctx.lc_stubs_begin && table < lc_global_ctx.lc_stubs_end)
+          {
+              lc_log("Read descriptor from continuation stub (%p).\n", table);
+              ___U64 stub_addr = (___U64)table;
+              ___U64 vec_addr = *((___U64*)(stub_addr+5));
+              ___U64 desc_addr = vec_addr - 1 + 16;
+              desc = *((___U64*)desc_addr);
+              desc = desc >> 2; // Because descriptor is tagged in stubs, we need to untag it
+          }
+          else
+          {
+              lc_log("Read descriptor from continuation version (%p).\n", table);
+              desc = table[-1];
+          }
+      }
+      else
+        desc = table[1];
       lc_log("reading descriptor at %p\n", (stack_ptr));
       print_lc_descriptor(desc);
+
       desc_fs = desc & 255;
       desc_mask = desc >> 8;
       stack_ptr += desc_fs;

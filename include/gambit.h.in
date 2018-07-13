@@ -8460,6 +8460,9 @@ struct LC_CTX {
     ___U64   lc_stack_desc;
     ___U8    lc_stack_usedesc;
     ___WORD* lc_global;
+    ___WORD* lc_stubs_begin;
+    ___WORD* lc_stubs_end;
+    ___U8    lc_intraprocedural; 
 };
 
 typedef struct LC_CTX LC_CTX;
