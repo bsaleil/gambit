@@ -26,6 +26,7 @@ LC_CTX lc_global_ctx = {0,NULL,NULL,0,0,NULL,NULL,NULL,0};
 #define LC_CALLBACK_CONT 2
 #define LC_CALLBACK_STUB 3
 #define LC_GENERIC_REST  4
+#define LC_GAMBIT_CALL   5
 
 //#define LC_DEBUG
 
@@ -6314,7 +6315,6 @@ ___HIDDEN void garbage_collect_lc_phase
         (___PSVNC)
 ___PSDKR)
 {
-
   ___PSGET
   ___virtual_machine_state ___vms = ___VMSTATE_FROM_PSTATE(___ps);
 
@@ -6367,6 +6367,13 @@ ___PSDKR)
           // GC called from generic rest param allocation, use pushed encoded fs as descriptor
           desc = (stack_ptr[1] >> 2)+1;
           stack_ptr += (desc & 255)+1;
+          break;
+      }
+      case LC_GAMBIT_CALL:
+      {
+          ___U64 nbargs =  stack_ptr[0];
+          desc = stack_ptr[1];
+          stack_ptr += (desc & 255) + 4 + nbargs - 1;
           break;
       }
       default:
@@ -6613,12 +6620,14 @@ ___SIZE_TS requested_words_still;)
 
   BARRIER();
 
-  if (lc_global_ctx.gc_lock != 0)
-  {
-      printf("ERROR: GC blocked by LC but called during callback init phase.\n");
-      printf("       Locked by %llu\n", lc_global_ctx.gc_lock);
-      exit(0);
-  }
+  #ifdef LC_DEBUG
+      if (lc_global_ctx.gc_lock != 0)
+      {
+          printf("ERROR: GC blocked by LC but called during callback init phase.\n");
+          printf("       Locked by %llu\n", lc_global_ctx.gc_lock);
+          exit(0);
+      }
+  #endif
 
   /* Process LC objects (nan boxed objects) */
   if (lc_global_ctx.lc_stack != NULL && lc_global_ctx.lc_stack_ptr != NULL)
