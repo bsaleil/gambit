@@ -6345,6 +6345,7 @@ ___PSDKR)
       {
           // GC called from lc fn callback, use registered frame descriptor
           desc = lc_global_ctx.lc_stack_desc;
+          stack_ptr += (desc & 255) - 1;
           break;
       }
       case LC_CALLBACK_CONT:
